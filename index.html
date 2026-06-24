@@ -1,22 +1,30 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Swift on Windows Internals Guide</title>
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        <style>
+            /* Custom CSS variables matching Swift.org design tokens */
+            :root {
+                --swift-orange: #f05138;
+                --swift-orange-hover: #d94126;
+                --swift-dark-bg: #1f242a;
+                --swift-sidebar-bg: #f5f5f7;
+                --swift-text: #333333;
+                --swift-code-text: #d11149;
+            }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            }
+        </style>
     </head>
-    <body class="bg-gray-50 text-gray-900 min-h-screen p-8">
-        <div id="root"></div>
+    <body class="bg-white text-[#333333] min-h-full flex flex-col m-0 p-0 antialiased">
+        <div id="root" class="w-full min-h-full flex flex-col"></div>
 
-        <script
-            crossorigin
-            src="https://unpkg.com/react@18/umd/react.production.min.js"
-        ></script>
-        <script
-            crossorigin
-            src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
-        ></script>
+        <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+        <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
         
         <script
             src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.28.4/babel.js"
@@ -25,7 +33,6 @@
         ></script>
 
         <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-        
         <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 
         <script type="text/babel">
@@ -62,36 +69,29 @@
                             setError(err.message);
                             setLoading(false);
                         });
-                }, []);
+                });
 
                 // Process and render Mermaid diagrams whenever content shifts
                 useEffect(() => {
                     if (loading || error || !content) return;
 
                     try {
-                        // 1. Initialize Mermaid configuration
                         mermaid.initialize({ 
                             startOnLoad: false,
-                            theme: 'default',
+                            theme: 'neutral',
                             securityLevel: 'loose' 
                         });
 
-                        // 2. Find standard markdown-parsed mermaid blocks inside the container
                         const targetNodes = containerRef.current.querySelectorAll("pre code.language-mermaid");
                         
                         targetNodes.forEach((codeNode) => {
                             const preNode = codeNode.parentElement;
-                            
-                            // Create a proper Mermaid container div
                             const mermaidDiv = document.createElement("div");
-                            mermaidDiv.className = "mermaid my-6 flex justify-center";
+                            mermaidDiv.className = "mermaid my-8 p-4 bg-gray-50 rounded-lg flex justify-center border border-gray-100";
                             mermaidDiv.textContent = codeNode.textContent;
-                            
-                            // Replace the <pre><code> block with our new <div>
                             preNode.parentNode.replaceChild(mermaidDiv, preNode);
                         });
 
-                        // 3. Command Mermaid to parse and render the newly injected divs
                         mermaid.run({
                             nodes: containerRef.current.querySelectorAll(".mermaid")
                         });
@@ -100,34 +100,90 @@
                     }
                 }, [content, loading, error]);
 
-                if (loading) {
-                    return <div className="text-center text-gray-500 font-semibold mt-10">Loading documentation...</div>;
-                }
-
-                if (error) {
-                    return (
-                        <div className="max-w-2xl mx-auto mt-10 bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
-                            <p className="font-bold">Error loading content:</p>
-                            <p>{error}</p>
-                        </div>
-                    );
-                }
-
                 return (
-                    <main className="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div 
-                            ref={containerRef}
-                            className="prose max-w-full break-words
-                                       [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:border-b [&_h1]:pb-2
-                                       [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:mt-6 [&_h2]:mb-3
-                                       [&_p]:mb-4 [&_p]:leading-relaxed
-                                       [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4
-                                       [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm
-                                       [&_pre]:bg-gray-100 [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:mb-4 [&_pre]:overflow-x-auto [&_pre]:max-w-full
-                                       [&_table]:w-full [&_table]:block [&_table]:overflow-x-auto [&_table]:mb-4"
-                            dangerouslySetInnerHTML={{ __html: content }} 
-                        />
-                    </main>
+                    <div class="flex flex-col min-h-screen w-full">
+                        {/* Swift.org Global Header */}
+                        <header class="bg-[#1f242a] text-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-sm">
+                            <div class="flex items-center space-x-3 max-w-7xl mx-auto w-full">
+                                {/* Simulated Logo Icon */}
+                                <svg class="w-7 h-7 fill-current text-[#f05138]" viewBox="0 0 24 24">
+                                    <path d="M21.9,11.5C21.7,11.3,16,6.3,11.5,2.1c-0.3-0.3-0.8-0.2-1,0.1C10,2.9,9.2,5.2,9.9,7.5C8.3,6.8,6,5.1,4.7,3.9 C4.5,3.7,4.1,3.8,4,4c-0.5,1.7-0.1,4.9,2.8,7.7c-2.3-0.4-4.8-1.5-5.9-2.2C0.7,9.4,0.3,9.6,0.3,9.9c0.4,2.3,2.4,5.9,6.7,7.8 c-2.8,0-5.4-1.2-6.4-1.7C0.3,15.8,0,16.1,0.1,16.4c1.1,2.8,4.9,5.5,10.6,5.5c7.3,0,11-4.6,11.2-10C22,11.8,22,11.6,21.9,11.5z"/>
+                                </svg>
+                                <span class="text-lg font-semibold tracking-wide">
+                                    Swift<span class="text-gray-400 font-light">.org</span>
+                                </span>
+                                <div class="hidden md:flex space-x-6 pl-8 text-sm font-medium text-gray-300">
+                                    <a href="#" class="hover:text-white transition">About</a>
+                                    <a href="#" class="text-white border-b-2 border-[#f05138] pb-1">Documentation</a>
+                                    <a href="#" class="hover:text-white transition">Download</a>
+                                    <a href="#" class="hover:text-white transition">Community</a>
+                                    <a href="#" class="hover:text-white transition">Blog</a>
+                                </div>
+                            </div>
+                        </header>
+
+                        {/* Sub-header Context Bar */}
+                        <div class="bg-[#293038] text-gray-300 text-xs py-2.5 px-6 border-t border-gray-700/50">
+                            <div class="max-w-7xl mx-auto w-full flex items-center space-x-2">
+                                <span class="hover:text-white cursor-pointer">Documentation</span>
+                                <span>/</span>
+                                <span class="hover:text-white cursor-pointer">Guides</span>
+                                <span>/</span>
+                                <span class="text-white font-medium">Swift on Windows Internals</span>
+                            </div>
+                        </div>
+
+                        {/* Page Container */}
+                        <div class="flex flex-1 max-w-7xl w-full mx-auto relative items-stretch">
+                            
+                            {/* Left Side Navigation (Swift-style Sidebar) */}
+                            <aside class="hidden lg:block w-64 bg-[#f5f5f7] border-r border-gray-200 p-6 shrink-0">
+                                <div class="sticky top-24">
+                                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">Windows Guides</h3>
+                                    <ul class="space-y-2.5 text-sm font-medium text-gray-600">
+                                        <li><a href="#" class="text-[#f05138] font-semibold block">Getting Started</a></li>
+                                        <li><a href="#" class="hover:text-gray-900 block transition">Compiler Architecture</a></li>
+                                        <li><a href="#" class="hover:text-gray-900 block transition">MSVCRT Integration</a></li>
+                                        <li><a href="#" class="hover:text-gray-900 block transition">ABI Stability & DLLs</a></li>
+                                        <li><a href="#" class="hover:text-gray-900 block transition">Troubleshooting</a></li>
+                                    </ul>
+                                </div>
+                            </aside>
+
+                            {/* Main Reading Canvas */}
+                            <main class="flex-1 min-w-0 bg-white px-6 py-10 sm:px-12 lg:px-16">
+                                {loading && (
+                                    <div class="flex items-center justify-center py-20">
+                                        <div class="animate-pulse text-sm font-medium text-gray-500">Loading Swift Documentation Canvas...</div>
+                                    </div>
+                                )}
+
+                                {error && (
+                                    <div class="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-md my-4 text-sm">
+                                        <p class="font-bold">Error Loading Resource:</p>
+                                        <p class="font-mono mt-1">{error}</p>
+                                    </div>
+                                )}
+
+                                {/* Markdown Content Panel */}
+                                <div 
+                                    ref={containerRef}
+                                    className="max-w-[44rem] mx-auto break-words text-[16px] leading-[1.65] text-[#333333]
+                                               [&_h1]:text-[34px] [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:tracking-tight [&_h1]:mb-6 [&_h1]:mt-2 [&_h1]:border-b [&_h1]:border-gray-100 [&_h1]:pb-3
+                                               [&_h2]:text-[24px] [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:tracking-tight [&_h2]:mt-10 [&_h2]:mb-4
+                                               [&_h3]:text-[19px] [&_h3]:font-semibold [&_h3]:text-gray-900 [&_h3]:mt-6 [&_h3]:mb-2
+                                               [&_p]:mb-5
+                                               [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-5 [&_ul_li]:mb-1.5
+                                               [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-5 [&_ol_li]:mb-1.5
+                                               [&_code]:bg-[#f5f5f7] [&_code]:text-[#d11149] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[0.875em] [&_code]:font-mono
+                                               [&_pre]:bg-[#f5f5f7] [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:mb-6 [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_pre_code]:text-gray-800 [&_pre_code]:bg-transparent [&_pre_code]:p-0
+                                               [&_table]:w-full [&_table]:mb-6 [&_table]:border-collapse [&_table_th]:border-b-2 [&_table_th]:border-gray-200 [&_table_th]:p-2 [&_table_th]:text-left [&_table_td]:border-b [&_table_td]:border-gray-100 [&_table_td]:p-2
+                                               [&_a]:text-[#f05138] [&_a]:no-underline hover:[&_a]:underline"
+                                    dangerouslySetInnerHTML={{ __html: content }} 
+                                />
+                            </main>
+                        </div>
+                    </div>
                 );
             }
 
