@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>GitHub Markdown Renderer</title>
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    </head>
+    <body class="bg-gray-50 text-gray-900 min-h-screen p-8">
+        <div id="root"></div>
+
+        <script
+            crossorigin
+            src="https://unpkg.com/react@18/umd/react.production.min.js"
+        ></script>
+        <script
+            crossorigin
+            src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+        ></script>
+        
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.28.4/babel.js"
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"
+        ></script>
+
+        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+        <script type="text/babel">
+            const { useState, useEffect } = React;
+
+            function MarkdownViewer() {
+                const [content, setContent] = useState("");
+                const [loading, setLoading] = useState(true);
+                const [error, setError] = useState(null);
+
+                const username = "designsbyblanc";
+                const repo = "swift_on_windows_docs";
+                const branch = "main";
+                const filePath = "README.md"; 
+
+                useEffect(() => {
+                    // GitHub Raw Content URL format
+                    const rawUrl = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${filePath}`;
+
+                    fetch(rawUrl)
+                        .then((response) => {
+                            if (!response.ok) {
+                                throw new Error(`Failed to fetch file: ${response.statusText}`);
+                            }
+                            return response.text();
+                        })
+                        .then((markdownText) => {
+                            // Convert the Markdown string into safe HTML
+                            const htmlContent = marked.parse(markdownText);
+                            setContent(htmlContent);
+                            setLoading(false);
+                        })
+                        .catch((err) => {
+                            setError(err.message);
+                            setLoading(false);
+                        });
+                }, []);
+
+                if (loading) {
+                    return <div class="text-center text-gray-500 font-semibold mt-10">Loading documentation...</div>;
+                }
+
+                if (error) {
+                    return (
+                        <div class="max-w-2xl mx-auto mt-10 bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
+                            <p class="font-bold">Error loading content:</p>
+                            <p>{error}</p>
+                        </div>
+                    );
+                }
+
+                return (
+                    <main class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+                        {/* We use dangerouslySetInnerHTML to mount the parsed HTML string. */}
+                        {/* Tailwind v4 tip: Using standard HTML styling classes here, but you can target elements directly */}
+                        <div 
+                            className="prose max-w-none 
+                                       [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:border-b [&_h1]:pb-2
+                                       [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:mt-6 [&_h2]:mb-3
+                                       [&_p]:mb-4 [&_p]:leading-relaxed
+                                       [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4
+                                       [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm"
+                            dangerouslySetInnerHTML={{ __html: content }} 
+                        />
+                    </main>
+                );
+            }
+
+            const root = ReactDOM.createRoot(document.getElementById("root"));
+            root.render(<MarkdownViewer />);
+        </script>
+    </body>
+</html>
