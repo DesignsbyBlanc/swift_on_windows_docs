@@ -2,6 +2,7 @@
 
 The following is a list (in no particular order) of the domains of expertise that are generally crossed and often synthesized in the development efforts to port the Swift programming language to the Windows OS and improve the overall developer experience for Swift users on Windows. Included are hyperlinks to some potentially relevant jumping off points
 
+## [Swift on Windows Workgroup](https://www.swift.org/windows-workgroup/)
 
 ### Canonical origin for porting Swift to Windows:
 
