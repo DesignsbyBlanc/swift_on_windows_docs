@@ -1,236 +1,434 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" class="h-full">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Swift on Windows Internals Guide</title>
-        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-        <style>
-            /* Custom CSS variables matching Swift.org design tokens */
-            :root {
-                --swift-orange: #f05138;
-                --swift-orange-hover: #d94126;
-                --swift-dark-bg: #1f242a;
-                --swift-sidebar-bg: #f5f5f7;
-                --swift-text: #333333;
-                --swift-code-text: #d11149;
-            }
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            }
-        </style>
-    </head>
-    <body class="bg-white text-[#333333] min-h-full flex flex-col m-0 p-0 antialiased">
-        <div id="root" class="w-full min-h-full flex flex-col"></div>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Swift on Windows Internals Guide</title>
+		<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+		<style>
+			:root {
+				--swift-orange: #f05138;
+				--swift-orange-hover: #d94126;
+				--swift-dark-bg: #1f242a;
+				--swift-sidebar-bg: #f5f5f7;
+				--swift-text: #333333;
+				--swift-code-text: #d11149;
+			}
+			body {
+				font-family:
+					-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+					Helvetica, Arial, sans-serif;
+			}
+		</style>
+	</head>
+	<body
+		class="bg-white text-[#333333] min-h-full flex flex-col m-0 p-0 antialiased"
+	>
+		<div id="root" class="w-full min-h-full flex flex-col"></div>
 
-        <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-        <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-        
-        <script
-            src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.28.4/babel.js"
-            crossorigin="anonymous"
-            referrerpolicy="no-referrer"
-        ></script>
+		<script
+			crossorigin
+			src="https://unpkg.com/react@18/umd/react.production.min.js"
+		></script>
+		<script
+			crossorigin
+			src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+		></script>
 
-        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+		<script
+			src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.28.4/babel.js"
+			crossorigin="anonymous"
+			referrerpolicy="no-referrer"
+		></script>
 
-        <script type="text/babel">
-            const { useState, useEffect, useRef } = React;
+		<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 
-            function MarkdownViewer() {
-                const username = "designsbyblanc";
-                const repo = "swift_on_windows_docs";
-                const branch = "main";
-                
-                // Configuration parameters
-                const EXCLUSION_LIST = [".github", ".gitignore", "LICENSE", "README.md", "images", "index.html"]; 
+		<script type="text/babel">
+			const { useState, useEffect, useRef } = React;
 
-                const [currentPath, setCurrentPath] = useState("README.md");
-                const [navItems, setNavItems] = useState([]);
-                const [content, setContent] = useState("");
-                const [loading, setLoading] = useState(true);
-                const [error, setError] = useState(null);
-                const containerRef = useRef(null);
+			// Recursive Component to Render the Nested Sidebar Layout
+			function FileTreeNode({ node, currentPath, onSelect }) {
+				const [isOpen, setIsOpen] = useState(true);
+				const isDirectory = node.type === "dir";
+				const isActive = currentPath === node.path;
 
-                // Fetch Navigation Structure from Root GitHub Dir
-                useEffect(() => {
-                    const apiUrl = `https://api.github.com/repos/${username}/${repo}/contents`;
+				// Format display names nicely
+				const formatName = (name) => {
+					if (name.toLowerCase() === "readme.md") return "Overview";
+					return name
+						.replace(/\.md$/i, "")
+						.replace(/_/g, " ")
+						.replace(/-/g, " ");
+				};
 
-                    fetch(apiUrl)
-                        .then((response) => {
-                            if (!response.ok) {
-                                throw new Error(`Failed to fetch repo directory structure: ${response.statusText}`);
-                            }
-                            return response.json();
-                        })
-                        .then((data) => {
-                            // Filter files based on exclusions
-                            const items = data
-                                .filter(item => !EXCLUSION_LIST.includes(item.name))
-                                .map(item => ({
-                                    name: item.name.replace(/_/g, ' ').replace(/-/g, ' '),
-                                    // Default back to target dir's README if target is a structural folder
-                                    path: item.type === "dir" ? `${item.name}/README.md` : item.path,
-                                    type: item.type
-                                }));
-                            
-                            // Include global Root Readme as structural base item
-                            setNavItems([{ name: "Welcome / Getting Started", path: "README.md", type: "file" }, ...items]);
-                        })
-                        .catch((err) => {
-                            console.error("Navigation setup failed:", err);
-                        });
-                }, []);
+				if (isDirectory) {
+					return (
+						<li className="mt-1">
+							<button
+								onClick={() => setIsOpen(!isOpen)}
+								className="w-full text-left flex items-center space-x-1 text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-gray-900 py-1 cursor-pointer transition select-none"
+							>
+								<span className="transform transition-transform duration-150 inline-block w-3 text-center">
+									{isOpen ? "▼" : "▶"}
+								</span>
+								<span>
+									{node.name
+										.replace(/_/g, " ")
+										.replace(/-/g, " ")}
+								</span>
+							</button>
+							{isOpen && (
+								<ul className="pl-3 border-l border-gray-200/60 ml-1.5 space-y-1 mt-1">
+									{node.children.map((child, idx) => (
+										<FileTreeNode
+											key={idx}
+											node={child}
+											currentPath={currentPath}
+											onSelect={onSelect}
+										/>
+									))}
+								</ul>
+							)}
+						</li>
+					);
+				}
 
-                // Fetch Specific Markdown Content via active path dependencies 
-                useEffect(() => {
-                    setLoading(true);
-                    const rawUrl = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${currentPath}`;
+				// Render leaf node (Markdown file)
+				return (
+					<li>
+						<button
+							onClick={() => onSelect(node.path)}
+							className={`w-full text-left capitalize transition cursor-pointer block py-1 text-sm font-medium pl-2 ${
+								isActive
+									? "text-[#f05138] font-semibold border-l-2 border-[#f05138] -ml-[2px]"
+									: "text-gray-600 hover:text-gray-900"
+							}`}
+						>
+							{formatName(node.name)}
+						</button>
+					</li>
+				);
+			}
 
-                    fetch(rawUrl)
-                        .then((response) => {
-                            if (!response.ok) {
-                                throw new Error(`Failed to load markdown content target file (${response.status})`);
-                            }
-                            return response.text();
-                        })
-                        .then((markdownText) => {
-                            const htmlContent = marked.parse(markdownText);
-                            setContent(htmlContent);
-                            setError(null);
-                            setLoading(false);
-                        })
-                        .catch((err) => {
-                            setError(err.message);
-                            setLoading(false);
-                        });
-                }, [currentPath]);
+			function MarkdownViewer() {
+				const username = "designsbyblanc";
+				const repo = "swift_on_windows_docs";
+				const branch = "main";
+				const EXCLUSION_LIST = [
+					".github",
+					".gitignore",
+					"LICENSE",
+					"images",
+				];
 
-                // Process and render Mermaid diagrams whenever content shifts
-                useEffect(() => {
-                    if (loading || error || !content) return;
+				const [currentPath, setCurrentPath] = useState("README.md");
+				const [navTree, setNavTree] = useState([]);
+				const [content, setContent] = useState("");
+				const [loading, setLoading] = useState(true);
+				const [error, setError] = useState(null);
+				const containerRef = useRef(null);
 
-                    try {
-                        mermaid.initialize({ 
-                            startOnLoad: false,
-                            theme: 'neutral',
-                            securityLevel: 'loose' 
-                        });
+				// Fetch Recursive tree and construct the internal layout hierarchy
+				useEffect(() => {
+					const apiUrl = `https://api.github.com/repos/${username}/${repo}/git/trees/${branch}?recursive=1`;
 
-                        const targetNodes = containerRef.current.querySelectorAll("pre code.language-mermaid");
-                        
-                        targetNodes.forEach((codeNode) => {
-                            const preNode = codeNode.parentElement;
-                            const mermaidDiv = document.createElement("div");
-                            mermaidDiv.className = "mermaid my-8 p-4 bg-gray-50 rounded-lg flex justify-center border border-gray-100";
-                            mermaidDiv.textContent = codeNode.textContent;
-                            preNode.parentNode.replaceChild(mermaidDiv, preNode);
-                        });
+					fetch(apiUrl)
+						.then((response) => {
+							if (!response.ok)
+								throw new Error(
+									`Network failure: ${response.statusText}`,
+								);
+							return response.json();
+						})
+						.then((data) => {
+							if (!data.tree) return;
 
-                        mermaid.run({
-                            nodes: containerRef.current.querySelectorAll(".mermaid")
-                        });
-                    } catch (mermaidError) {
-                        console.error("Mermaid execution error:", mermaidError);
-                    }
-                }, [content, loading, error]);
+							// Root of our UI structural tree array
+							const rootChildren = [];
 
-                // Helper tool to construct Context Breadcrumbs dynamically
-                const getBreadcrumbs = () => {
-                    if (currentPath === "README.md") return ["Guides", "Swift on Windows Internals"];
-                    const steps = currentPath.split('/');
-                    // Format names back nicely for the crumb UI
-                    const formattedSteps = steps
-                        .filter(s => s.toLowerCase() !== "readme.md")
-                        .map(s => s.replace(/_/g, ' ').replace(/-/g, ' '));
-                    return ["Guides", ...formattedSteps];
-                };
+							// Helper mapping reference to easily bind objects under directories
+							const dirMap = {};
 
-                return (
-                    <div className="flex flex-col min-h-screen w-full">
-                        {/* Swift.org Global Header */}
-                        <header className="bg-[#1f242a] text-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-sm">
-                            <div className="flex items-center space-x-3 max-w-7xl mx-auto w-full">
-                                <svg className="w-7 h-7 fill-current text-[#f05138]" viewBox="0 0 24 24">
-                                    <path d="M21.9,11.5C21.7,11.3,16,6.3,11.5,2.1c-0.3-0.3-0.8-0.2-1,0.1C10,2.9,9.2,5.2,9.9,7.5C8.3,6.8,6,5.1,4.7,3.9 C4.5,3.7,4.1,3.8,4,4c-0.5,1.7-0.1,4.9,2.8,7.7c-2.3-0.4-4.8-1.5-5.9-2.2C0.7,9.4,0.3,9.6,0.3,9.9c0.4,2.3,2.4,5.9,6.7,7.8 c-2.8,0-5.4-1.2-6.4-1.7C0.3,15.8,0,16.1,0.1,16.4c1.1,2.8,4.9,5.5,10.6,5.5c7.3,0,11-4.6,11.2-10C22,11.8,22,11.6,21.9,11.5z"/>
-                                </svg>
-                                <span className="text-lg font-semibold tracking-wide">
-                                    Swift<span className="text-gray-400 font-light">.org</span>
-                                </span>
-                                <div className="hidden md:flex space-x-6 pl-8 text-sm font-medium text-gray-300">
-                                    <a href="https://www.swift.org/documentation/" className="text-white border-b-2 border-[#f05138] pb-1">Documentation</a>
-                                    <a href="https://www.swift.org/install/windows/" className="hover:text-white transition">Install</a>
-                                    <a href="https://www.swift.org/community/" className="hover:text-white transition">Community</a>
-                                    <a href="https://www.swift.org/blog/" className="hover:text-white transition">Blog</a>
-                                </div>
-                            </div>
-                        </header>
+							// Sort files cleanly alphabetically
+							const sortedTree = data.tree.sort((a, b) =>
+								a.path.localeCompare(b.path),
+							);
 
-                        {/* Dynamic Sub-header Context Bar */}
-                        <div className="bg-[#293038] text-gray-300 text-xs py-2.5 px-6 border-t border-gray-700/50">
-                            <div className="max-w-7xl mx-auto w-full flex items-center space-x-2 select-none">
-                                <span className="hover:text-white cursor-pointer" onClick={() => setCurrentPath("README.md")}>Documentation</span>
-                                {getBreadcrumbs().map((crumb, idx, arr) => (
-                                    <React.Fragment key={idx}>
-                                        <span>/</span>
-                                        <span className={idx === arr.length - 1 ? "text-white font-medium capitalize" : "hover:text-white cursor-pointer capitalize"}>
-                                            {crumb}
-                                        </span>
-                                    </React.Fragment>
-                                ))}
-                            </div>
-                        </div>
+							sortedTree.forEach((item) => {
+								const segments = item.path.split("/");
 
-                        {/* Page Container */}
-                        <div className="flex flex-1 max-w-7xl w-full mx-auto relative items-stretch">
-                            
-                            {/* Left Side Navigation (Dynamic Swift-style Sidebar) */}
-                            <aside className="hidden lg:block w-64 bg-[#f5f5f7] border-r border-gray-200 p-6 shrink-0">
-                                <div className="sticky top-24">
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">Windows Guides</h3>
-                                    <ul className="space-y-2.5 text-sm font-medium text-gray-600">
-                                        {navItems.map((item, index) => {
-                                            const isActive = currentPath === item.path;
-                                            return (
-                                                <li key={index}>
-                                                    <button 
-                                                        onClick={() => setCurrentPath(item.path)}
-                                                        className={`w-full text-left capitalize transition cursor-pointer block ${
-                                                            isActive 
-                                                            ? "text-[#f05138] font-semibold" 
-                                                            : "hover:text-gray-900"
-                                                        }`}
-                                                    >
-                                                        {item.name}
-                                                    </button>
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                </div>
-                            </aside>
+								// Skip files/folders inside our Exclusion List
+								if (
+									segments.some((seg) =>
+										EXCLUSION_LIST.includes(seg),
+									)
+								)
+									return;
 
-                            {/* Main Reading Canvas */}
-                            <main className="flex-1 min-w-0 bg-white px-6 py-10 sm:px-12 lg:px-16">
-                                {loading && (
-                                    <div className="flex items-center justify-center py-20">
-                                        <div className="animate-pulse text-sm font-medium text-gray-500">Loading Swift Documentation Canvas...</div>
-                                    </div>
-                                )}
+								// Separate pure filename / foldername from global structural map
+								const name = segments[segments.length - 1];
+								const parentPath = segments
+									.slice(0, -1)
+									.join("/");
 
-                                {error && (
-                                    <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-md my-4 text-sm">
-                                        <p className="font-bold">Error Loading Resource:</p>
-                                        <p className="font-mono mt-1">{error}</p>
-                                    </div>
-                                )}
+								if (item.type === "tree") {
+									// Directory Node setup
+									const dirNode = {
+										name,
+										path: item.path,
+										type: "dir",
+										children: [],
+									};
+									dirMap[item.path] = dirNode;
 
-                                {/* Markdown Content Panel */}
-                                {!loading && !error && (
-                                    <div 
-                                        ref={containerRef}
-                                        className="max-w-[44rem] mx-auto break-words text-[16px] leading-[1.65] text-[#333333]
+									if (!parentPath) {
+										rootChildren.push(dirNode);
+									} else if (dirMap[parentPath]) {
+										dirMap[parentPath].children.push(
+											dirNode,
+										);
+									}
+								} else if (
+									item.type === "blob" &&
+									item.path.toLowerCase().endsWith(".md")
+								) {
+									// File Node Setup
+									const fileNode = {
+										name,
+										path: item.path,
+										type: "file",
+									};
+
+									if (!parentPath) {
+										// Specific adjustment to keep the root README floating gracefully at the top
+										if (
+											name.toLowerCase() === "readme.md"
+										) {
+											rootChildren.unshift(fileNode);
+										} else {
+											rootChildren.push(fileNode);
+										}
+									} else if (dirMap[parentPath]) {
+										// Push internal markdown file directly under its tree reference
+										if (
+											name.toLowerCase() === "readme.md"
+										) {
+											dirMap[parentPath].children.unshift(
+												fileNode,
+											);
+										} else {
+											dirMap[parentPath].children.push(
+												fileNode,
+											);
+										}
+									}
+								}
+							});
+
+							setNavTree(rootChildren);
+						})
+						.catch((err) =>
+							console.error(
+								"Hierarchical structure load error:",
+								err,
+							),
+						);
+				}, []);
+
+				// Fetch target Document content hook
+				useEffect(() => {
+					setLoading(true);
+					const rawUrl = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${currentPath}`;
+
+					fetch(rawUrl)
+						.then((response) => {
+							if (!response.ok)
+								throw new Error(
+									`Target resource load dropped (${response.status})`,
+								);
+							return response.text();
+						})
+						.then((markdownText) => {
+							setContent(marked.parse(markdownText));
+							setError(null);
+							setLoading(false);
+						})
+						.catch((err) => {
+							setError(err.message);
+							setLoading(false);
+						});
+				}, [currentPath]);
+
+				// Render Mermaid graphs
+				useEffect(() => {
+					if (loading || error || !content) return;
+					try {
+						mermaid.initialize({
+							startOnLoad: false,
+							theme: "neutral",
+							securityLevel: "loose",
+						});
+						const targetNodes =
+							containerRef.current.querySelectorAll(
+								"pre code.language-mermaid",
+							);
+						targetNodes.forEach((codeNode) => {
+							const preNode = codeNode.parentElement;
+							const mermaidDiv = document.createElement("div");
+							mermaidDiv.className =
+								"mermaid my-8 p-4 bg-gray-50 rounded-lg flex justify-center border border-gray-100";
+							mermaidDiv.textContent = codeNode.textContent;
+							preNode.parentNode.replaceChild(
+								mermaidDiv,
+								preNode,
+							);
+						});
+						mermaid.run({
+							nodes: containerRef.current.querySelectorAll(
+								".mermaid",
+							),
+						});
+					} catch (err) {
+						console.error("Mermaid execution error:", err);
+					}
+				}, [content, loading, error]);
+
+				// Context Bar calculations
+				const getBreadcrumbs = () => {
+					if (currentPath === "README.md")
+						return ["Guides", "Swift on Windows Internals"];
+					const segments = currentPath.split("/");
+					const cleanedSegments = segments.map((seg) => {
+						if (seg.toLowerCase() === "readme.md")
+							return "Overview";
+						return seg
+							.replace(/\.md$/i, "")
+							.replace(/_/g, " ")
+							.replace(/-/g, " ");
+					});
+					return ["Guides", ...cleanedSegments];
+				};
+
+				return (
+					<div className="flex flex-col min-h-screen w-full">
+						{/* Swift.org Global Header */}
+						<header className="bg-[#1f242a] text-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-sm">
+							<div className="flex items-center space-x-3 max-w-7xl mx-auto w-full">
+								<svg
+									className="w-7 h-7 fill-current text-[#f05138]"
+									viewBox="0 0 24 24"
+								>
+									<path d="M21.9,11.5C21.7,11.3,16,6.3,11.5,2.1c-0.3-0.3-0.8-0.2-1,0.1C10,2.9,9.2,5.2,9.9,7.5C8.3,6.8,6,5.1,4.7,3.9 C4.5,3.7,4.1,3.8,4,4c-0.5,1.7-0.1,4.9,2.8,7.7c-2.3-0.4-4.8-1.5-5.9-2.2C0.7,9.4,0.3,9.6,0.3,9.9c0.4,2.3,2.4,5.9,6.7,7.8 c-2.8,0-5.4-1.2-6.4-1.7C0.3,15.8,0,16.1,0.1,16.4c1.1,2.8,4.9,5.5,10.6,5.5c7.3,0,11-4.6,11.2-10C22,11.8,22,11.6,21.9,11.5z" />
+								</svg>
+								<span className="text-lg font-semibold tracking-wide">
+									Swift
+									<span className="text-gray-400 font-light">
+										.org
+									</span>
+								</span>
+								<div className="hidden md:flex space-x-6 pl-8 text-sm font-medium text-gray-300">
+									<a
+										href="https://www.swift.org/documentation/"
+										className="text-white border-b-2 border-[#f05138] pb-1"
+									>
+										Documentation
+									</a>
+									<a
+										href="https://www.swift.org/install/windows/"
+										className="hover:text-white transition"
+									>
+										Install
+									</a>
+									<a
+										href="https://www.swift.org/community/"
+										className="hover:text-white transition"
+									>
+										Community
+									</a>
+									<a
+										href="https://www.swift.org/blog/"
+										className="hover:text-white transition"
+									>
+										Blog
+									</a>
+								</div>
+							</div>
+						</header>
+
+						{/* Context Breadcrumbs Bar */}
+						<div className="bg-[#293038] text-gray-300 text-xs py-2.5 px-6 border-t border-gray-700/50">
+							<div className="max-w-7xl mx-auto w-full flex items-center space-x-2 select-none">
+								<span
+									className="hover:text-white cursor-pointer"
+									onClick={() => setCurrentPath("README.md")}
+								>
+									Documentation
+								</span>
+								{getBreadcrumbs().map((crumb, idx, arr) => (
+									<React.Fragment key={idx}>
+										<span>/</span>
+										<span
+											className={
+												idx === arr.length - 1
+													? "text-white font-medium capitalize"
+													: "text-gray-400 capitalize"
+											}
+										>
+											{crumb}
+										</span>
+									</React.Fragment>
+								))}
+							</div>
+						</div>
+
+						{/* Main Body Grid Layout */}
+						<div className="flex flex-1 max-w-7xl w-full mx-auto relative items-stretch">
+							{/* Nested Sidebar */}
+							<aside className="hidden lg:block w-64 bg-[#f5f5f7] border-r border-gray-200 p-6 shrink-0">
+								<div className="sticky top-24">
+									<h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">
+										Windows Guides
+									</h3>
+									<ul className="space-y-1.5">
+										{navTree.map((node, index) => (
+											<FileTreeNode
+												key={index}
+												node={node}
+												currentPath={currentPath}
+												onSelect={setCurrentPath}
+											/>
+										))}
+									</ul>
+								</div>
+							</aside>
+
+							{/* Canvas Section */}
+							<main className="flex-1 min-w-0 bg-white px-6 py-10 sm:px-12 lg:px-16">
+								{loading && (
+									<div className="flex items-center justify-center py-20">
+										<div className="animate-pulse text-sm font-medium text-gray-500">
+											Loading Swift Documentation
+											Canvas...
+										</div>
+									</div>
+								)}
+
+								{error && (
+									<div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-md my-4 text-sm">
+										<p className="font-bold">
+											Error Loading Resource:
+										</p>
+										<p className="font-mono mt-1">
+											{error}
+										</p>
+									</div>
+								)}
+
+								{!loading && !error && (
+									<div
+										ref={containerRef}
+										className="max-w-[44rem] mx-auto break-words text-[16px] leading-[1.65] text-[#333333]
                                                    [&_h1]:text-[34px] [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:tracking-tight [&_h1]:mb-6 [&_h1]:mt-2 [&_h1]:border-b [&_h1]:border-gray-100 [&_h1]:pb-3
                                                    [&_h2]:text-[24px] [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:tracking-tight [&_h2]:mt-10 [&_h2]:mb-4
                                                    [&_h3]:text-[19px] [&_h3]:font-semibold [&_h3]:text-gray-900 [&_h3]:mt-6 [&_h3]:mb-2
@@ -241,17 +439,19 @@
                                                    [&_pre]:bg-[#f5f5f7] [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:mb-6 [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_pre_code]:text-gray-800 [&_pre_code]:bg-transparent [&_pre_code]:p-0
                                                    [&_table]:w-full [&_table]:mb-6 [&_table]:border-collapse [&_table_th]:border-b-2 [&_table_th]:border-gray-200 [&_table_th]:p-2 [&_table_th]:text-left [&_table_td]:border-b [&_table_td]:border-gray-100 [&_table_td]:p-2
                                                    [&_a]:text-[#f05138] [&_a]:no-underline hover:[&_a]:underline"
-                                        dangerouslySetInnerHTML={{ __html: content }} 
-                                    />
-                                )}
-                            </main>
-                        </div>
-                    </div>
-                );
-            }
+										dangerouslySetInnerHTML={{
+											__html: content,
+										}}
+									/>
+								)}
+							</main>
+						</div>
+					</div>
+				);
+			}
 
-            const root = ReactDOM.createRoot(document.getElementById("root"));
-            root.render(<MarkdownViewer />);
-        </script>
-    </body>
+			const root = ReactDOM.createRoot(document.getElementById("root"));
+			root.render(<MarkdownViewer />);
+		</script>
+	</body>
 </html>

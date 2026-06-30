@@ -2,6 +2,8 @@
 
 ## [Introduction to LLVM](https://www.youtube.com/watch?v=J5xExRGaIIY)
 
+---
+
 [**Introduction:**](https://llvm.org/docs/ProgrammersManual.html#introduction)
 
 This document is meant to highlight some of the important classes and interfaces available in the LLVM source-base. This manual is not intended to explain what LLVM is, how it works, and what LLVM code looks like. It assumes that you know the basics of LLVM and are interested in writing transformations or otherwise analyzing or manipulating the code.
