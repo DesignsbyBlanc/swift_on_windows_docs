@@ -294,20 +294,47 @@
 					}
 				}, [content, loading, error]);
 
-				// Context Bar calculations
+				// Context Bar calculations with actionable paths
 				const getBreadcrumbs = () => {
-					if (currentPath === "README.md")
-						return ["Guides", "Swift on Windows Internals"];
+					if (currentPath === "README.md") {
+						return [
+							{
+								name: "Swift on Windows Internals",
+								path: "README.md",
+							},
+						];
+					}
+
 					const segments = currentPath.split("/");
-					const cleanedSegments = segments.map((seg) => {
-						if (seg.toLowerCase() === "readme.md")
-							return "Overview";
-						return seg
-							.replace(/\.md$/i, "")
-							.replace(/_/g, " ")
-							.replace(/-/g, " ");
+					let cumulativePath = "";
+
+					return segments.map((seg, idx) => {
+						cumulativePath = cumulativePath
+							? `${cumulativePath}/${seg}`
+							: seg;
+
+						let displayLabel = seg;
+						let targetPath = cumulativePath;
+
+						if (seg.toLowerCase() === "readme.md") {
+							displayLabel = "Overview";
+						} else {
+							displayLabel = seg
+								.replace(/\.md$/i, "")
+								.replace(/_/g, " ")
+								.replace(/-/g, " ");
+						}
+
+						// If a mid-segment points to a folder layout instead of an .md, point it to its default fallback README
+						if (!targetPath.toLowerCase().endsWith(".md")) {
+							targetPath = `${targetPath}/README.md`;
+						}
+
+						return {
+							name: displayLabel,
+							path: targetPath,
+						};
 					});
-					return ["Guides", ...cleanedSegments];
 				};
 
 				return (
@@ -360,25 +387,34 @@
 						<div className="bg-[#293038] text-gray-300 text-xs py-2.5 px-6 border-t border-gray-700/50">
 							<div className="max-w-7xl mx-auto w-full flex items-center space-x-2 select-none">
 								<span
-									className="hover:text-white cursor-pointer"
+									className="hover:text-white cursor-pointer transition"
 									onClick={() => setCurrentPath("README.md")}
 								>
 									Documentation
 								</span>
-								{getBreadcrumbs().map((crumb, idx, arr) => (
-									<React.Fragment key={idx}>
-										<span>/</span>
-										<span
-											className={
-												idx === arr.length - 1
-													? "text-white font-medium capitalize"
-													: "text-gray-400 capitalize"
-											}
-										>
-											{crumb}
-										</span>
-									</React.Fragment>
-								))}
+								{getBreadcrumbs().map((crumb, idx, arr) => {
+									const isLast = idx === arr.length - 1;
+									return (
+										<React.Fragment key={idx}>
+											<span className="text-gray-500">
+												/
+											</span>
+											<button
+												disabled={isLast}
+												onClick={() =>
+													setCurrentPath(crumb.path)
+												}
+												className={`capitalize transition text-left ${
+													isLast
+														? "text-white font-medium cursor-default"
+														: "text-gray-400 hover:text-white cursor-pointer"
+												}`}
+											>
+												{crumb.name}
+											</button>
+										</React.Fragment>
+									);
+								})}
 							</div>
 						</div>
 
