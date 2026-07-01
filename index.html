@@ -1,470 +1,498 @@
 <!doctype html>
 <html lang="en" class="h-full">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Swift on Windows Internals Guide</title>
-		<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-		<style>
-			:root {
-				--swift-orange: #f05138;
-				--swift-orange-hover: #d94126;
-				--swift-dark-bg: #1f242a;
-				--swift-sidebar-bg: #f5f5f7;
-				--swift-text: #333333;
-				--swift-code-text: #d11149;
-			}
-			body {
-				font-family:
-					-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-					Helvetica, Arial, sans-serif;
-			}
-		</style>
-	</head>
-	<body
-		class="bg-white text-[#333333] min-h-full flex flex-col m-0 p-0 antialiased"
-	>
-		<div id="root" class="w-full min-h-full flex flex-col"></div>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Swift on Windows Internals Guide</title>
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        <style>
+            :root {
+                --swift-orange: #f05138;
+                --swift-orange-hover: #d94126;
+                --swift-dark-bg: #1f242a;
+                --swift-sidebar-bg: #f5f5f7;
+                --swift-text: #333333;
+                --swift-code-text: #d11149;
+            }
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    Helvetica, Arial, sans-serif;
+            }
+        </style>
+    </head>
+    <body
+        class="bg-white text-[#333333] min-h-full flex flex-col m-0 p-0 antialiased"
+    >
+        <div id="root" class="w-full min-h-full flex flex-col"></div>
 
-		<script
-			crossorigin
-			src="https://unpkg.com/react@18/umd/react.production.min.js"
-		></script>
-		<script
-			crossorigin
-			src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
-		></script>
+        <script
+            crossorigin
+            src="https://unpkg.com/react@18/umd/react.production.min.js"
+        ></script>
+        <script
+            crossorigin
+            src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+        ></script>
 
-		<script
-			src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.28.4/babel.js"
-			crossorigin="anonymous"
-			referrerpolicy="no-referrer"
-		></script>
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.28.4/babel.js"
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"
+        ></script>
 
-		<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-		<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 
-		<script type="text/babel">
-			const { useState, useEffect, useRef } = React;
+        <script type="text/babel">
+            const { useState, useEffect, useRef } = React;
 
-			// Recursive Component to Render the Nested Sidebar Layout
-			function FileTreeNode({ node, currentPath, onSelect }) {
-				const [isOpen, setIsOpen] = useState(true);
-				const isDirectory = node.type === "dir";
-				const isActive = currentPath === node.path;
+            // Recursive Component to Render the Nested Sidebar Layout
+            function FileTreeNode({ node, currentPath, onSelect }) {
+                const [isOpen, setIsOpen] = useState(true);
+                const isDirectory = node.type === "dir";
+                const isActive = currentPath === node.path;
 
-				// Format display names nicely
-				const formatName = (name) => {
-					if (name.toLowerCase() === "readme.md") return "Overview";
-					return name
-						.replace(/\.md$/i, "")
-						.replace(/_/g, " ")
-						.replace(/-/g, " ");
-				};
+                // Format display names nicely
+                const formatName = (name) => {
+                    if (name.toLowerCase() === "readme.md") return "Overview";
+                    return name
+                        .replace(/\.md$/i, "")
+                        .replace(/_/g, " ")
+                        .replace(/-/g, " ");
+                };
 
-				if (isDirectory) {
-					return (
-						<li className="mt-1">
-							<button
-								onClick={() => setIsOpen(!isOpen)}
-								className="w-full text-left flex items-center space-x-1 text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-gray-900 py-1 cursor-pointer transition select-none"
-							>
-								<span className="transform transition-transform duration-150 inline-block w-3 text-center">
-									{isOpen ? "▼" : "▶"}
-								</span>
-								<span>
-									{node.name
-										.replace(/_/g, " ")
-										.replace(/-/g, " ")}
-								</span>
-							</button>
-							{isOpen && (
-								<ul className="pl-3 border-l border-gray-200/60 ml-1.5 space-y-1 mt-1">
-									{node.children.map((child, idx) => (
-										<FileTreeNode
-											key={idx}
-											node={child}
-											currentPath={currentPath}
-											onSelect={onSelect}
-										/>
-									))}
-								</ul>
-							)}
-						</li>
-					);
-				}
+                if (isDirectory) {
+                    return (
+                        <li className="mt-1">
+                            <button
+                                onClick={() => setIsOpen(!isOpen)}
+                                className="w-full text-left flex items-center space-x-1 text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-gray-900 py-1 cursor-pointer transition select-none"
+                            >
+                                <span className="transform transition-transform duration-150 inline-block w-3 text-center">
+                                    {isOpen ? "▼" : "▶"}
+                                </span>
+                                <span>
+                                    {node.name
+                                        .replace(/_/g, " ")
+                                        .replace(/-/g, " ")}
+                                </span>
+                            </button>
+                            {isOpen && (
+                                <ul className="pl-3 border-l border-gray-200/60 ml-1.5 space-y-1 mt-1">
+                                    {node.children.map((child, idx) => (
+                                        <FileTreeNode
+                                            key={idx}
+                                            node={child}
+                                            currentPath={currentPath}
+                                            onSelect={onSelect}
+                                        />
+                                    ))}
+                                </ul>
+                            )}
+                        </li>
+                    );
+                }
 
-				// Render leaf node (Markdown file)
-				return (
-					<li>
-						<button
-							onClick={() => onSelect(node.path)}
-							className={`w-full text-left capitalize transition cursor-pointer block py-1 text-sm font-medium pl-2 ${
-								isActive
-									? "text-[#f05138] font-semibold border-l-2 border-[#f05138] -ml-[2px]"
-									: "text-gray-600 hover:text-gray-900"
-							}`}
-						>
-							{formatName(node.name)}
-						</button>
-					</li>
-				);
-			}
+                // Render leaf node (Markdown file)
+                return (
+                    <li>
+                        <button
+                            onClick={() => onSelect(node.path)}
+                            className={`w-full text-left capitalize transition cursor-pointer block py-1 text-sm font-medium pl-2 ${
+                                isActive
+                                    ? "text-[#f05138] font-semibold border-l-2 border-[#f05138] -ml-[2px]"
+                                    : "text-gray-600 hover:text-gray-900"
+                            }`}
+                        >
+                            {formatName(node.name)}
+                        </button>
+                    </li>
+                );
+            }
 
-			function MarkdownViewer() {
-				const username = "designsbyblanc";
-				const repo = "swift_on_windows_docs";
-				const branch = "main";
-				const EXCLUSION_LIST = [
-					".github",
-					".gitignore",
-					"LICENSE",
-					"images",
-				];
+            function MarkdownViewer() {
+                const username = "designsbyblanc";
+                const repo = "swift_on_windows_docs";
+                const branch = "main";
+                const EXCLUSION_LIST = [
+                    ".github",
+                    ".gitignore",
+                    "LICENSE",
+                    "images",
+                    "images",
+                ];
 
-				const [currentPath, setCurrentPath] = useState("README.md");
-				const [navTree, setNavTree] = useState([]);
-				const [content, setContent] = useState("");
-				const [loading, setLoading] = useState(true);
-				const [error, setError] = useState(null);
-				const containerRef = useRef(null);
+                const [currentPath, setCurrentPath] = useState("README.md");
+                const [navTree, setNavTree] = useState([]);
+                const [content, setContent] = useState("");
+                const [loading, setLoading] = useState(true);
+                const [error, setError] = useState(null);
+                const [isMobileOpen, setIsMobileOpen] = useState(false);
+                const containerRef = useRef(null);
 
-				// Fetch Recursive tree and construct the internal layout hierarchy
-				useEffect(() => {
-					const apiUrl = `https://api.github.com/repos/${username}/${repo}/git/trees/${branch}?recursive=1`;
+                // Fetch Recursive tree and construct the internal layout hierarchy
+                useEffect(() => {
+                    const apiUrl = `https://api.github.com/repos/${username}/${repo}/git/trees/${branch}?recursive=1`;
 
-					fetch(apiUrl)
-						.then((response) => {
-							if (!response.ok)
-								throw new Error(
-									`Network failure: ${response.statusText}`,
-								);
-							return response.json();
-						})
-						.then((data) => {
-							if (!data.tree) return;
+                    fetch(apiUrl)
+                        .then((response) => {
+                            if (!response.ok)
+                                throw new Error(
+                                    `Network failure: ${response.statusText}`,
+                                );
+                            return response.json();
+                        })
+                        .then((data) => {
+                            if (!data.tree) return;
 
-							// Root of our UI structural tree array
-							const rootChildren = [];
+                            // Root of our UI structural tree array
+                            const rootChildren = [];
 
-							// Helper mapping reference to easily bind objects under directories
-							const dirMap = {};
+                            // Helper mapping reference to easily bind objects under directories
+                            const dirMap = {};
 
-							// Sort files cleanly alphabetically
-							const sortedTree = data.tree.sort((a, b) =>
-								a.path.localeCompare(b.path),
-							);
+                            // Sort files cleanly alphabetically
+                            const sortedTree = data.tree.sort((a, b) =>
+                                a.path.localeCompare(b.path),
+                            );
 
-							sortedTree.forEach((item) => {
-								const segments = item.path.split("/");
+                            sortedTree.forEach((item) => {
+                                const segments = item.path.split("/");
 
-								// Skip files/folders inside our Exclusion List
-								if (
-									segments.some((seg) =>
-										EXCLUSION_LIST.includes(seg),
-									)
-								)
-									return;
+                                // Skip files/folders inside our Exclusion List
+                                if (
+                                    segments.some((seg) =>
+                                        EXCLUSION_LIST.includes(seg),
+                                    )
+                                )
+                                    return;
 
-								// Separate pure filename / foldername from global structural map
-								const name = segments[segments.length - 1];
-								const parentPath = segments
-									.slice(0, -1)
-									.join("/");
+                                // Separate pure filename / foldername from global structural map
+                                const name = segments[segments.length - 1];
+                                const parentPath = segments
+                                    .slice(0, -1)
+                                    .join("/");
 
-								if (item.type === "tree") {
-									// Directory Node setup
-									const dirNode = {
-										name,
-										path: item.path,
-										type: "dir",
-										children: [],
-									};
-									dirMap[item.path] = dirNode;
+                                if (item.type === "tree") {
+                                    // Directory Node setup
+                                    const dirNode = {
+                                        name,
+                                        path: item.path,
+                                        type: "dir",
+                                        children: [],
+                                    };
+                                    dirMap[item.path] = dirNode;
 
-									if (!parentPath) {
-										rootChildren.push(dirNode);
-									} else if (dirMap[parentPath]) {
-										dirMap[parentPath].children.push(
-											dirNode,
-										);
-									}
-								} else if (
-									item.type === "blob" &&
-									item.path.toLowerCase().endsWith(".md")
-								) {
-									// File Node Setup
-									const fileNode = {
-										name,
-										path: item.path,
-										type: "file",
-									};
+                                    if (!parentPath) {
+                                        rootChildren.push(dirNode);
+                                    } else if (dirMap[parentPath]) {
+                                        dirMap[parentPath].children.push(
+                                            dirNode,
+                                        );
+                                    }
+                                } else if (
+                                    item.type === "blob" &&
+                                    item.path.toLowerCase().endsWith(".md")
+                                ) {
+                                    // File Node Setup
+                                    const fileNode = {
+                                        name,
+                                        path: item.path,
+                                        type: "file",
+                                    };
 
-									if (!parentPath) {
-										// Specific adjustment to keep the root README floating gracefully at the top
-										if (
-											name.toLowerCase() === "readme.md"
-										) {
-											rootChildren.unshift(fileNode);
-										} else {
-											rootChildren.push(fileNode);
-										}
-									} else if (dirMap[parentPath]) {
-										// Push internal markdown file directly under its tree reference
-										if (
-											name.toLowerCase() === "readme.md"
-										) {
-											dirMap[parentPath].children.unshift(
-												fileNode,
-											);
-										} else {
-											dirMap[parentPath].children.push(
-												fileNode,
-											);
-										}
-									}
-								}
-							});
+                                    if (!parentPath) {
+                                        // Specific adjustment to keep the root README floating gracefully at the top
+                                        if (
+                                            name.toLowerCase() === "readme.md"
+                                        ) {
+                                            rootChildren.unshift(fileNode);
+                                        } else {
+                                            rootChildren.push(fileNode);
+                                        }
+                                    } else if (dirMap[parentPath]) {
+                                        // Push internal markdown file directly under its tree reference
+                                        if (
+                                            name.toLowerCase() === "readme.md"
+                                        ) {
+                                            dirMap[parentPath].children.unshift(
+                                                fileNode,
+                                            );
+                                        } else {
+                                            dirMap[parentPath].children.push(
+                                                fileNode,
+                                            );
+                                        }
+                                    }
+                                }
+                            });
 
-							setNavTree(rootChildren);
-						})
-						.catch((err) =>
-							console.error(
-								"Hierarchical structure load error:",
-								err,
-							),
-						);
-				}, []);
+                            setNavTree(rootChildren);
+                        })
+                        .catch((err) =>
+                            console.error(
+                                "Hierarchical structure load error:",
+                                err,
+                            ),
+                        );
+                }, []);
 
-				// Fetch target Document content hook
-				useEffect(() => {
-					setLoading(true);
-					const rawUrl = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${currentPath}`;
+                // Fetch target Document content hook
+                useEffect(() => {
+                    setLoading(true);
+                    const rawUrl = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${currentPath}`;
 
-					fetch(rawUrl)
-						.then((response) => {
-							if (!response.ok)
-								throw new Error(
-									`Target resource load dropped (${response.status})`,
-								);
-							return response.text();
-						})
-						.then((markdownText) => {
-							setContent(marked.parse(markdownText));
-							setError(null);
-							setLoading(false);
-						})
-						.catch((err) => {
-							setError(err.message);
-							setLoading(false);
-						});
-				}, [currentPath]);
+                    fetch(rawUrl)
+                        .then((response) => {
+                            if (!response.ok)
+                                throw new Error(
+                                    `Target resource load dropped (${response.status})`,
+                                );
+                            return response.text();
+                        })
+                        .then((markdownText) => {
+                            setContent(marked.parse(markdownText));
+                            setError(null);
+                            setLoading(false);
+                        })
+                        .catch((err) => {
+                            setError(err.message);
+                            setLoading(false);
+                        });
+                }, [currentPath]);
 
-				// Render Mermaid graphs
-				useEffect(() => {
-					if (loading || error || !content) return;
-					try {
-						mermaid.initialize({
-							startOnLoad: false,
-							theme: "neutral",
-							securityLevel: "loose",
-						});
-						const targetNodes =
-							containerRef.current.querySelectorAll(
-								"pre code.language-mermaid",
-							);
-						targetNodes.forEach((codeNode) => {
-							const preNode = codeNode.parentElement;
-							const mermaidDiv = document.createElement("div");
-							mermaidDiv.className =
-								"mermaid my-8 p-4 bg-gray-50 rounded-lg flex justify-center border border-gray-100";
-							mermaidDiv.textContent = codeNode.textContent;
-							preNode.parentNode.replaceChild(
-								mermaidDiv,
-								preNode,
-							);
-						});
-						mermaid.run({
-							nodes: containerRef.current.querySelectorAll(
-								".mermaid",
-							),
-						});
-					} catch (err) {
-						console.error("Mermaid execution error:", err);
-					}
-				}, [content, loading, error]);
+                // Render Mermaid graphs
+                useEffect(() => {
+                    if (loading || error || !content) return;
+                    try {
+                        mermaid.initialize({
+                            startOnLoad: false,
+                            theme: "neutral",
+                            securityLevel: "loose",
+                        });
+                        const targetNodes =
+                            containerRef.current.querySelectorAll(
+                                "pre code.language-mermaid",
+                            );
+                        targetNodes.forEach((codeNode) => {
+                            const preNode = codeNode.parentElement;
+                            const mermaidDiv = document.createElement("div");
+                            mermaidDiv.className =
+                                "mermaid my-8 p-4 bg-gray-50 rounded-lg flex justify-center border border-gray-100";
+                            mermaidDiv.textContent = codeNode.textContent;
+                            preNode.parentNode.replaceChild(
+                                mermaidDiv,
+                                preNode,
+                            );
+                        });
+                        mermaid.run({
+                            nodes: containerRef.current.querySelectorAll(
+                                ".mermaid",
+                            ),
+                        });
+                    } catch (err) {
+                        console.error("Mermaid execution error:", err);
+                    }
+                }, [content, loading, error]);
 
-				// Context Bar calculations with actionable paths
-				const getBreadcrumbs = () => {
-					if (currentPath === "README.md") {
-						return [
-							{
-								name: "Swift on Windows Internals",
-								path: "README.md",
-							},
-						];
-					}
+                // Context Bar calculations with actionable paths
+                const getBreadcrumbs = () => {
+                    if (currentPath === "README.md") {
+                        return [
+                            {
+                                name: "Swift on Windows Internals",
+                                path: "README.md",
+                            },
+                        ];
+                    }
 
-					const segments = currentPath.split("/");
-					let cumulativePath = "";
+                    const segments = currentPath.split("/");
+                    let cumulativePath = "";
 
-					return segments.map((seg, idx) => {
-						cumulativePath = cumulativePath
-							? `${cumulativePath}/${seg}`
-							: seg;
+                    return segments.map((seg, idx) => {
+                        cumulativePath = cumulativePath
+                            ? `${cumulativePath}/${seg}`
+                            : seg;
 
-						let displayLabel = seg;
-						let targetPath = cumulativePath;
+                        let displayLabel = seg;
+                        let targetPath = cumulativePath;
 
-						if (seg.toLowerCase() === "readme.md") {
-							displayLabel = "Overview";
-						} else {
-							displayLabel = seg
-								.replace(/\.md$/i, "")
-								.replace(/_/g, " ")
-								.replace(/-/g, " ");
-						}
+                        if (seg.toLowerCase() === "readme.md") {
+                            displayLabel = "Overview";
+                        } else {
+                            displayLabel = seg
+                                .replace(/\.md$/i, "")
+                                .replace(/_/g, " ")
+                                .replace(/-/g, " ");
+                        }
 
-						// If a mid-segment points to a folder layout instead of an .md, point it to its default fallback README
-						if (!targetPath.toLowerCase().endsWith(".md")) {
-							targetPath = `${targetPath}/README.md`;
-						}
+                        // If a mid-segment points to a folder layout instead of an .md, point it to its default fallback README
+                        if (!targetPath.toLowerCase().endsWith(".md")) {
+                            targetPath = `${targetPath}/README.md`;
+                        }
 
-						return {
-							name: displayLabel,
-							path: targetPath,
-						};
-					});
-				};
+                        return {
+                            name: displayLabel,
+                            path: targetPath,
+                        };
+                    });
+                };
 
-				return (
-					<div className="flex flex-col min-h-screen w-full">
-						{/* Swift.org Global Header */}
-						<header className="bg-[#1f242a] text-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-sm">
-							<div className="flex items-center space-x-3 max-w-7xl mx-auto w-full">
-								<svg
-									className="w-7 h-7 fill-current text-[#f05138]"
-									viewBox="0 0 24 24"
-								>
-									<path d="M21.9,11.5C21.7,11.3,16,6.3,11.5,2.1c-0.3-0.3-0.8-0.2-1,0.1C10,2.9,9.2,5.2,9.9,7.5C8.3,6.8,6,5.1,4.7,3.9 C4.5,3.7,4.1,3.8,4,4c-0.5,1.7-0.1,4.9,2.8,7.7c-2.3-0.4-4.8-1.5-5.9-2.2C0.7,9.4,0.3,9.6,0.3,9.9c0.4,2.3,2.4,5.9,6.7,7.8 c-2.8,0-5.4-1.2-6.4-1.7C0.3,15.8,0,16.1,0.1,16.4c1.1,2.8,4.9,5.5,10.6,5.5c7.3,0,11-4.6,11.2-10C22,11.8,22,11.6,21.9,11.5z" />
-								</svg>
-								<span className="text-lg font-semibold tracking-wide">
-									Swift
-									<span className="text-gray-400 font-light">
-										.org
-									</span>
-								</span>
-								<div className="hidden md:flex space-x-6 pl-8 text-sm font-medium text-gray-300">
-									<a
-										href="https://www.swift.org/documentation/"
-										className="text-white border-b-2 border-[#f05138] pb-1"
-									>
-										Documentation
-									</a>
-									<a
-										href="https://www.swift.org/install/windows/"
-										className="hover:text-white transition"
-									>
-										Install
-									</a>
-									<a
-										href="https://www.swift.org/community/"
-										className="hover:text-white transition"
-									>
-										Community
-									</a>
-									<a
-										href="https://www.swift.org/blog/"
-										className="hover:text-white transition"
-									>
-										Blog
-									</a>
-								</div>
-							</div>
-						</header>
+                const handleSelectNode = (path) => {
+                    setCurrentPath(path);
+                    setIsMobileOpen(false); // Close mobile drawer when an option is selected
+                };
 
-						{/* Context Breadcrumbs Bar */}
-						<div className="bg-[#293038] text-gray-300 text-xs py-2.5 px-6 border-t border-gray-700/50">
-							<div className="max-w-7xl mx-auto w-full flex items-center space-x-2 select-none">
-								<span
-									className="hover:text-white cursor-pointer transition"
-									onClick={() => setCurrentPath("README.md")}
-								>
-									Documentation
-								</span>
-								{getBreadcrumbs().map((crumb, idx, arr) => {
-									const isLast = idx === arr.length - 1;
-									return (
-										<React.Fragment key={idx}>
-											<span className="text-gray-500">
-												/
-											</span>
-											<button
-												disabled={isLast}
-												onClick={() =>
-													setCurrentPath(crumb.path)
-												}
-												className={`capitalize transition text-left ${
-													isLast
-														? "text-white font-medium cursor-default"
-														: "text-gray-400 hover:text-white cursor-pointer"
-												}`}
-											>
-												{crumb.name}
-											</button>
-										</React.Fragment>
-									);
-								})}
-							</div>
-						</div>
+                return (
+                    <div className="flex flex-col min-h-screen w-full relative">
+                        {/* Swift.org Global Header */}
+                        <header className="bg-[#1f242a] text-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-sm">
+                            <div className="flex items-center space-x-3 max-w-7xl mx-auto w-full">
+                                <svg
+                                    className="w-7 h-7 fill-current text-[#f05138]"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path d="M21.9,11.5C21.7,11.3,16,6.3,11.5,2.1c-0.3-0.3-0.8-0.2-1,0.1C10,2.9,9.2,5.2,9.9,7.5C8.3,6.8,6,5.1,4.7,3.9 C4.5,3.7,4.1,3.8,4,4c-0.5,1.7-0.1,4.9,2.8,7.7c-2.3-0.4-4.8-1.5-5.9-2.2C0.7,9.4,0.3,9.6,0.3,9.9c0.4,2.3,2.4,5.9,6.7,7.8 c-2.8,0-5.4-1.2-6.4-1.7C0.3,15.8,0,16.1,0.1,16.4c1.1,2.8,4.9,5.5,10.6,5.5c7.3,0,11-4.6,11.2-10C22,11.8,22,11.6,21.9,11.5z" />
+                                </svg>
+                                <span className="text-lg font-semibold tracking-wide">
+                                    Swift
+                                    <span className="text-gray-400 font-light">
+                                        .org
+                                    </span>
+                                </span>
+                                <div className="hidden md:flex space-x-6 pl-8 text-sm font-medium text-gray-300">
+                                    <a
+                                        href="https://www.swift.org/documentation/"
+                                        className="text-white border-b-2 border-[#f05138] pb-1"
+                                    >
+                                        Documentation
+                                    </a>
+                                    <a
+                                        href="https://www.swift.org/install/windows/"
+                                        className="hover:text-white transition"
+                                    >
+                                        Install
+                                    </a>
+                                    <a
+                                        href="https://www.swift.org/community/"
+                                        className="hover:text-white transition"
+                                    >
+                                        Community
+                                    </a>
+                                    <a
+                                        href="https://www.swift.org/blog/"
+                                        className="hover:text-white transition"
+                                    >
+                                        Blog
+                                    </a>
+                                </div>
+                            </div>
+                        </header>
 
-						{/* Main Body Grid Layout */}
-						<div className="flex flex-1 max-w-7xl w-full mx-auto relative items-stretch">
-							{/* Nested Sidebar */}
-							<aside className="hidden lg:block w-64 bg-[#f5f5f7] border-r border-gray-200 p-6 shrink-0">
-								<div className="sticky top-24">
-									<h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">
-										Windows Guides
-									</h3>
-									<ul className="space-y-1.5">
-										{navTree.map((node, index) => (
-											<FileTreeNode
-												key={index}
-												node={node}
-												currentPath={currentPath}
-												onSelect={setCurrentPath}
-											/>
-										))}
-									</ul>
-								</div>
-							</aside>
+                        {/* Context Breadcrumbs Bar */}
+                        <div className="bg-[#293038] text-gray-300 text-xs py-2.5 px-6 border-t border-gray-700/50">
+                            <div className="max-w-7xl mx-auto w-full flex items-center space-x-2 select-none">
+                                <span
+                                    className="hover:text-white cursor-pointer transition"
+                                    onClick={() => handleSelectNode("README.md")}
+                                >
+                                    Documentation
+                                </span>
+                                {getBreadcrumbs().map((crumb, idx, arr) => {
+                                    const isLast = idx === arr.length - 1;
+                                    return (
+                                        <React.Fragment key={idx}>
+                                            <span className="text-gray-500">
+                                                /
+                                            </span>
+                                            <button
+                                                disabled={isLast}
+                                                onClick={() =>
+                                                    handleSelectNode(crumb.path)
+                                                }
+                                                className={`capitalize transition text-left ${
+                                                    isLast
+                                                        ? "text-white font-medium cursor-default"
+                                                        : "text-gray-400 hover:text-white cursor-pointer"
+                                                }`}
+                                            >
+                                                {crumb.name}
+                                            </button>
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </div>
+                        </div>
 
-							{/* Canvas Section */}
-							<main className="flex-1 min-w-0 bg-white px-6 py-10 sm:px-12 lg:px-16">
-								{loading && (
-									<div className="flex items-center justify-center py-20">
-										<div className="animate-pulse text-sm font-medium text-gray-500">
-											Loading Swift Documentation
-											Canvas...
-										</div>
-									</div>
-								)}
+                        {/* Main Body Grid Layout */}
+                        <div className="flex flex-1 max-w-7xl w-full mx-auto relative items-stretch">
+                            {/* Backdrop shadow screen overlay for mobile navigation view */}
+                            {isMobileOpen && (
+                                <div 
+                                    className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-xs transition-opacity"
+                                    onClick={() => setIsMobileOpen(false)}
+                                />
+                            )}
 
-								{error && (
-									<div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-md my-4 text-sm">
-										<p className="font-bold">
-											Error Loading Resource:
-										</p>
-										<p className="font-mono mt-1">
-											{error}
-										</p>
-									</div>
-								)}
+                            {/* Responsive Navigation Sidebar */}
+                            <aside className={`
+                                fixed lg:static top-0 bottom-0 left-0 z-40 
+                                w-72 lg:w-64 bg-[#f5f5f7] border-r border-gray-200 p-6 shrink-0 
+                                transform transition-transform duration-300 ease-out
+                                lg:transform-none lg:block
+                                ${isMobileOpen ? "translate-x-0 pt-24 shadow-2xl" : "-translate-x-full lg:translate-x-0"}
+                            `}>
+                                <div className="sticky top-24">
+                                    <div className="flex justify-between items-center mb-4 lg:mb-2">
+                                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                                            Windows Guides
+                                        </h3>
+                                        <button 
+                                            onClick={() => setIsMobileOpen(false)}
+                                            className="lg:hidden text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                    <ul className="space-y-1.5 overflow-y-auto max-h-[calc(100vh-120px)] lg:max-h-[calc(100vh-160px)] pr-2">
+                                        {navTree.map((node, index) => (
+                                            <FileTreeNode
+                                                key={index}
+                                                node={node}
+                                                currentPath={currentPath}
+                                                onSelect={handleSelectNode}
+                                            />
+                                        ))}
+                                    </ul>
+                                </div>
+                            </aside>
 
-								{!loading && !error && (
-									<div
-										ref={containerRef}
-										className="max-w-[44rem] mx-auto break-words text-[16px] leading-[1.65] text-[#333333]
+                            {/* Canvas Section */}
+                            <main className="flex-1 min-w-0 bg-white px-6 py-10 sm:px-12 lg:px-16">
+                                {loading && (
+                                    <div className="flex items-center justify-center py-20">
+                                        <div className="animate-pulse text-sm font-medium text-gray-500">
+                                            Loading Swift Documentation Canvas...
+                                        </div>
+                                    </div>
+                                )}
+
+                                {error && (
+                                    <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-md my-4 text-sm">
+                                        <p className="font-bold">
+                                            Error Loading Resource:
+                                        </p>
+                                        <p className="font-mono mt-1">
+                                            {error}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {!loading && !error && (
+                                    <div
+                                        ref={containerRef}
+                                        className="max-w-[44rem] mx-auto break-words text-[16px] leading-[1.65] text-[#333333]
                                                    [&_h1]:text-[34px] [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:tracking-tight [&_h1]:mb-6 [&_h1]:mt-2 [&_h1]:border-b [&_h1]:border-gray-100 [&_h1]:pb-3
                                                    [&_h2]:text-[24px] [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:tracking-tight [&_h2]:mt-10 [&_h2]:mb-4
                                                    [&_h3]:text-[19px] [&_h3]:font-semibold [&_h3]:text-gray-900 [&_h3]:mt-6 [&_h3]:mb-2
@@ -475,19 +503,38 @@
                                                    [&_pre]:bg-[#f5f5f7] [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:mb-6 [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_pre_code]:text-gray-800 [&_pre_code]:bg-transparent [&_pre_code]:p-0
                                                    [&_table]:w-full [&_table]:mb-6 [&_table]:border-collapse [&_table_th]:border-b-2 [&_table_th]:border-gray-200 [&_table_th]:p-2 [&_table_th]:text-left [&_table_td]:border-b [&_table_td]:border-gray-100 [&_table_td]:p-2
                                                    [&_a]:text-[#f05138] [&_a]:no-underline hover:[&_a]:underline"
-										dangerouslySetInnerHTML={{
-											__html: content,
-										}}
-									/>
-								)}
-							</main>
-						</div>
-					</div>
-				);
-			}
+                                        dangerouslySetInnerHTML={{
+                                            __html: content,
+                                        }}
+                                    />
+                                )}
+                            </main>
+                        </div>
 
-			const root = ReactDOM.createRoot(document.getElementById("root"));
-			root.render(<MarkdownViewer />);
-		</script>
-	</body>
+                        {/* Floating Bubble FAB trigger (Only displays on mobile views) */}
+                        <button
+                            onClick={() => setIsMobileOpen(!isMobileOpen)}
+                            className="fixed bottom-6 right-6 lg:hidden z-50 bg-[#f05138] hover:bg-[#d94126] text-white p-4 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer"
+                            aria-label="Toggle Navigation Tree"
+                        >
+                            <svg
+                                className="w-6 h-6 fill-none stroke-current"
+                                strokeWidth="2"
+                                viewBox="0 0 24 24"
+                            >
+                                {isMobileOpen ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                                )}
+                            </svg>
+                        </button>
+                    </div>
+                );
+            }
+
+            const root = ReactDOM.createRoot(document.getElementById("root"));
+            root.render(<MarkdownViewer />);
+        </script>
+    </body>
 </html>
